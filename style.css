@@ -27,6 +27,7 @@ html, body {
   width: min(980px, calc(100vw - 24px));
   display: flex;
   justify-content: space-between;
+  pointer-events: none;
 }
 
 .score, .title {
@@ -42,4 +43,5 @@ html, body {
   text-align: center;
   font-size: 10px;
   color: rgba(0,0,0,0.6);
+  pointer-events: none;
 }
