@@ -1,206 +1,210 @@
 (() => {
-  const canvas = document.getElementById("game");
-  const ctx = canvas.getContext("2d");
-  const scoreEl = document.getElementById("score");
-  const hint = document.getElementById("hint");
-
-  // Ensure canvas uses pixel font once loaded (prevents iOS fallback jank)
-  const fontReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
-
-  // ---------------- Game tuning (EASIER + more readable pacing) ----------------
-  const GROUND_Y = canvas.height - 58;
-
-  const GRAVITY = 1700;
-  const JUMP_V = 660;
-
-  const START_SPEED = 290;
-  const SPEED_GAIN = 4.6;
-
-  // MORE gaps between obstacles (easier)
-  const GAP_MIN = 0.95;
-  const GAP_MAX = 1.55;
-
-  // Occasional doubles, but rare (not sweaty)
-  const DOUBLE_PROB = 0.14;
-
-  // ---------------- Text (in-world marquee) ----------------
-  const phrases = [
-    "Question coming up (bear with me — remember I coded this shit / stole some from Google).",
+  // ---------- Messages ----------
+  const messages = [
+    "Question coming up (bear with me - remember I coded this shit / stole some from Google)",
     "And yeah, you’re probably thinking: this dumb-ass had to code this stream of consciousness. Is this technically extra work or buffer for assets to load? We’ll never know…",
     "Anyway!!!",
     "Would you be free this coming Saturday to go for wine and/or dinner?",
     "And you can totally say no. There are no expectations, but!!!!!",
     "(Anything but complete the MA degree amirite?)",
-    "Even if you say no: for you = fun. For me = my laptop is levitating.",
-    "That you’re super cool, and I wouldn’t enjoy following someone else around on random department stuff half as much if it wasn’t you.",
+    "Even if you say no, here is a fun way (for you: for me my laptop is now probably levitating by the time I’ve got to this line of code - its 5 years old Tanja; consider this its euthanising) TO SAY!! Back on track now!!",
+    "That you’re super cool, and I wouldn’t enjoy following someone else around on random department stuff half as much if it wasn’t you",
     "Ok so this is an addition: yeah my laptop crashed. Meteor to dinosaur crashed."
   ];
 
-  // Make sure the wall happens *after* all of the above + end beats.
-  const endBeat1 = "You can die now.";
-  const endBeat2 = "Really — I know you're a hardcore sweat, or maybe you're hoping I added a challenge in this somewhere. Actually...yeah, let's make this harder...";
+  // Score thresholds for the main messages
+  const thresholds = [150, 300, 450, 650, 800, 950, 1150, 1400, 1700];
 
-  // When to append each phrase (score-ish distance)
-  // Tuned so a normal run reaches the whole script.
-  const thresholds = [120, 250, 380, 560, 720, 880, 1060, 1280, 1500];
-  const endBeat1At = 1680;
-  const endBeat2At = 1760;
+  // How long each message stays visible (ms).
+  // Make the long one linger longer.
+  const durations = [5200, 6500, 3500, 8000, 5200, 4200, 11000, 7000, 7000];
 
-  // Big separators/gaps between phrases
-  const SEPARATOR = "                 ✦                 ";
+  // ---------- NEW endgame sequence ----------
+  const END_1_SCORE = 1900;
+  const END_2_SCORE = 2025;
+  const WALL_SCORE  = 2200;
 
-  let phraseIndex = 0;
-  let marquee = "";
-  let marqueeX = canvas.width + 40;
-  let endBeat1Added = false;
-  let endBeat2Added = false;
+  const end1 = "You can die now.";
+  const end2 = "Really - I know you're a hardcore sweat, or maybe you're hoping I added a challenge in this somewhere. Actually...yeah, let's make this harder...";
 
-  function appendMarquee(t) {
-    marquee += (marquee ? SEPARATOR : "") + t;
-  }
+  let end1Shown = false;
+  let end2Shown = false;
+  let wallSpawned = false;
 
-  // ---------------- Dino sprite (actual 🦖-readable silhouette) ----------------
-  // 0 empty, 1 body, 2 eye, 3 teeth (small white pixels)
-  // Two frames swap leg pixels for run animation.
-  // Inspired by the T-Rex emoji proportions: big head + open mouth, tiny arms, thick legs, long tail. 
-  const DINO_FRAMES = [
-    [
-      "0000000001111111110000000000",
-      "0000000111111111111100000000",
-      "0000001111111111111110000000",
-      "0000011111111111111111000000",
-      "0000111111111111111111100000",
-      "0001111111111111111111110000",
-      "0001111111111111111111110000",
-      "0001111111111112222111110000",
-      "0001111111111113333111110000",
-      "0001111111111111111111100000",
-      "0001111111111111111111000000",
-      "0000111111111111111110000000",
-      "0000011111111111111000000000",
-      "0000001111111111110000000000",
-      "0000000111111111100000000000",
-      "0000000011111111000000000000",
-      "0000000011111110000000000000",
-      "0000000011111110000000000000",
-      "0000000111111111000000000000",
-      "0000001111111111100000000000",
-      "0000011111111111110000000000",
-      "0000111111111111111000000000",
-      "0001111111110111111100000000",
-      "0001111111100011111100000000",
-      "0001111111100011111100000000",
-      "0000111111000001111000000000",
-      "0000011110000000110000000000",
-      "0000001100000000110000000000",
-      "0000001100000001100000000000",
-      "0000000000000000000000000000",
-    ],
-    [
-      "0000000001111111110000000000",
-      "0000000111111111111100000000",
-      "0000001111111111111110000000",
-      "0000011111111111111111000000",
-      "0000111111111111111111100000",
-      "0001111111111111111111110000",
-      "0001111111111111111111110000",
-      "0001111111111112222111110000",
-      "0001111111111113333111110000",
-      "0001111111111111111111100000",
-      "0001111111111111111111000000",
-      "0000111111111111111110000000",
-      "0000011111111111111000000000",
-      "0000001111111111110000000000",
-      "0000000111111111100000000000",
-      "0000000011111111000000000000",
-      "0000000011111110000000000000",
-      "0000000011111110000000000000",
-      "0000000111111111000000000000",
-      "0000001111111111100000000000",
-      "0000011111111111110000000000",
-      "0000111111111111111000000000",
-      "0001111111110111111100000000",
-      "0001111111100011111100000000",
-      "0001111111000001111100000000",
-      "0000111111000001111000000000",
-      "0000011110000000111100000000",
-      "0000001100000000011000000000",
-      "0000001100000001100000000000",
-      "0000000000000000000000000000",
-    ]
-  ];
+  // ---------- Canvas setup ----------
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
 
-  const SCALE = 3; // bigger = more clearly a dino
-  const SPRITE_W = DINO_FRAMES[0][0].length * SCALE;
-  const SPRITE_H = DINO_FRAMES[0].length * SCALE;
+  const scoreEl = document.getElementById("score");
+  const overlay = document.getElementById("overlay");
+  const hint = document.getElementById("hint");
 
+  // ---------- Game constants (EARLY DEMO DIFFICULTY) ----------
+  const GROUND_Y = canvas.height - 58;
+  const GRAVITY = 1800;
+  const JUMP_V = 650;
+  const START_SPEED = 330;
+  const SPEED_GAIN = 6;
+
+  // Dino hitbox (the classic cube dino from the first demo)
   const dino = {
     x: 90,
     y: GROUND_Y,
+    w: 34,
+    h: 46,
     vy: 0,
     onGround: true,
-    animT: 0,
   };
 
-  function drawDino(frameIndex, isCrashed) {
-    const frame = DINO_FRAMES[frameIndex];
-    const body = isCrashed ? "rgba(192,57,43,1)" : "rgba(18,18,18,1)";
-    const eye = "rgba(255,255,255,1)";
-    const teeth = "rgba(255,255,255,0.95)";
-
-    for (let r = 0; r < frame.length; r++) {
-      const row = frame[r];
-      for (let c = 0; c < row.length; c++) {
-        const px = row[c];
-        if (px === "0") continue;
-
-        if (px === "1") ctx.fillStyle = body;
-        else if (px === "2") ctx.fillStyle = eye;
-        else ctx.fillStyle = teeth;
-
-        ctx.fillRect(
-          dino.x + c * SCALE,
-          dino.y - SPRITE_H + r * SCALE,
-          SCALE,
-          SCALE
-        );
-      }
-    }
-  }
-
-  // ---------------- Obstacles ----------------
+  // Obstacles
   const obstacles = [];
   let nextSpawnIn = 0;
 
-  function spawnObstaclePack() {
-    const add = (w, h, xOffset = 0, kind = "cactus") => {
-      obstacles.push({ kind, x: canvas.width + 20 + xOffset, y: GROUND_Y, w, h });
-    };
+  // Game state
+  let running = false;
+  let crashed = false;
+  let blackout = false;
+  let blackoutMsg = "";
 
-    const r = Math.random();
-    if (r < DOUBLE_PROB) {
-      add(18, 34, 0);
-      add(18, 34, 30);
-    } else if (r < 0.85) {
-      add(18, 34, 0);
-    } else {
-      add(26, 54, 0);
-    }
+  let speed = START_SPEED;
+  let distance = 0; // score-ish
+  let lastTs = null;
 
-    nextSpawnIn = (GAP_MIN + Math.random() * (GAP_MAX - GAP_MIN)) * (canvas.width / speed);
+  // Message state
+  let nextMsgIndex = 0;
+  let hideTimer = null;
+
+  function showMessage(text, ms = 5200) {
+    overlay.textContent = text;
+    overlay.classList.add("show");
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => overlay.classList.remove("show"), ms);
   }
 
-  function spawnWall() {
+  function updateMainMessages() {
+    if (nextMsgIndex >= thresholds.length) return;
+    if (distance >= thresholds[nextMsgIndex]) {
+      showMessage(messages[nextMsgIndex], durations[nextMsgIndex] ?? 5200);
+      nextMsgIndex++;
+    }
+  }
+
+  function resetGame() {
+    obstacles.length = 0;
+    nextSpawnIn = 0;
+    speed = START_SPEED;
+    distance = 0;
+    nextMsgIndex = 0;
+
+    end1Shown = false;
+    end2Shown = false;
+    wallSpawned = false;
+
+    dino.y = GROUND_Y;
+    dino.vy = 0;
+    dino.onGround = true;
+
+    crashed = false;
+    running = false;
+
+    blackout = false;
+    blackoutMsg = "";
+
+    scoreEl.textContent = "0";
+    overlay.classList.remove("show");
+    hint.textContent = "Tap / click to start & jump. Space works on laptop. Tap again after crash to restart.";
+  }
+
+  function startGame() {
+    if (running || blackout) return;
+    running = true;
+    crashed = false;
+    hint.textContent = "Go go go 🦖";
+  }
+
+  function crashNormal() {
+    crashed = true;
+    running = false;
+    hint.textContent = "💥 Crash! Tap / click to restart.";
+  }
+
+  function crashToBlack(msg) {
+    crashed = true;
+    running = false;
+    blackout = true;
+    blackoutMsg = msg;
+    hint.textContent = "Tap / click to restart.";
+  }
+
+  function jump() {
+    if (blackout) {
+      resetGame();
+      startGame();
+      return;
+    }
+
+    if (!running && !crashed) startGame();
+
+    if (crashed) {
+      resetGame();
+      startGame();
+      return;
+    }
+
+    if (dino.onGround && running) {
+      dino.vy = -JUMP_V;
+      dino.onGround = false;
+    }
+  }
+
+  // Controls: space + tap/click (iPhone)
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space" || e.code === "ArrowUp") {
+      e.preventDefault();
+      jump();
+    }
+  });
+
+  const pointerHandler = (e) => {
+    e.preventDefault();
+    jump();
+  };
+  window.addEventListener("pointerdown", pointerHandler, { passive: false });
+  window.addEventListener("touchstart", pointerHandler, { passive: false });
+
+  // ---------- Obstacles ----------
+  function spawnObstacle() {
+    const variant = Math.random();
+    const h = variant < 0.6 ? 34 : variant < 0.9 ? 46 : 58;
+    const w = variant < 0.6 ? 18 : variant < 0.9 ? 22 : 26;
+
+    obstacles.push({
+      kind: "cactus",
+      x: canvas.width + 20,
+      y: GROUND_Y,
+      w,
+      h,
+    });
+
+    // Early demo spacing (moderate)
+    const minGap = 0.65;
+    const maxGap = 1.2;
+    nextSpawnIn = (minGap + Math.random() * (maxGap - minGap)) * (canvas.width / speed);
+  }
+
+  function spawnHugeWall() {
+    // Intentionally unjumpable + huge
     obstacles.push({
       kind: "wall",
       x: canvas.width + 40,
       y: GROUND_Y,
       w: 110,
-      h: 210, // deliberately unfair
+      h: 220
     });
+    wallSpawned = true;
   }
 
-  function overlap(a, b) {
+  function rectsOverlap(a, b) {
     return (
       a.x < b.x + b.w &&
       a.x + a.w > b.x &&
@@ -209,104 +213,18 @@
     );
   }
 
-  // ---------------- State ----------------
-  let running = false;
-  let crashed = false;
-  let blackout = false;
-  let blackoutMsg = "";
-
-  let speed = START_SPEED;
-  let distance = 0;
-  let lastTs = null;
-
-  function resetGame() {
-    obstacles.length = 0;
-    nextSpawnIn = 0;
-    speed = START_SPEED;
-    distance = 0;
-
-    dino.y = GROUND_Y;
-    dino.vy = 0;
-    dino.onGround = true;
-    dino.animT = 0;
-
-    running = false;
-    crashed = false;
-    blackout = false;
-    blackoutMsg = "";
-
-    phraseIndex = 0;
-    marquee = "";
-    marqueeX = canvas.width + 40;
-    endBeat1Added = false;
-    endBeat2Added = false;
-
-    scoreEl.textContent = "0";
-    hint.textContent = "Tap / click to start & jump. Tap after crash to restart.";
-  }
-
-  function startGame() {
-    if (!running && !blackout) {
-      running = true;
-      hint.textContent = "🦖";
-    }
-  }
-
-  function crashToBlack(msg) {
-    running = false;
-    crashed = true;
-    blackout = true;
-    blackoutMsg = msg;
-    hint.textContent = "Tap / click to restart.";
-  }
-
-  function crashNormal() {
-    running = false;
-    crashed = true;
-    hint.textContent = "💥 Crash! Tap / click to restart.";
-  }
-
-  function jump() {
-    if (blackout || crashed) {
-      resetGame();
-      startGame();
-      return;
-    }
-    if (!running) startGame();
-    if (dino.onGround) {
-      dino.vy = -JUMP_V;
-      dino.onGround = false;
-    }
-  }
-
-  window.addEventListener("keydown", (e) => {
-    if (e.code === "Space" || e.code === "ArrowUp") {
-      e.preventDefault();
-      jump();
-    }
-  });
-
-  window.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    jump();
-  }, { passive: false });
-
-  window.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    jump();
-  }, { passive: false });
-
-  // ---------------- Render ----------------
+  // ---------- Render ----------
   function drawBlackout() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = "white";
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.font = "20px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = `16px "Press Start 2P", monospace`;
 
-    // simple wrap
+    // Basic wrap
     const maxW = canvas.width - 80;
     const words = blackoutMsg.split(" ");
     const lines = [];
@@ -334,43 +252,47 @@
       return;
     }
 
-    // clear + background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // sky
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // in-world text: centered between top and ground
-    const textY = Math.floor((GROUND_Y * 0.5) - 12);
-
-    ctx.fillStyle = "rgba(0,0,0,0.22)";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    ctx.font = `20px "Press Start 2P", monospace`;
-    if (marquee) ctx.fillText(marquee, marqueeX, textY);
-
-    // ground line
+    // ground
     ctx.strokeStyle = "rgba(0,0,0,0.22)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(0, GROUND_Y);
-    ctx.lineTo(canvas.width, GROUND_Y);
+    ctx.moveTo(0, GROUND_Y + 1);
+    ctx.lineTo(canvas.width, GROUND_Y + 1);
     ctx.stroke();
 
-    // dino
-    const frameIndex = (Math.floor(dino.animT * 10) % 2);
-    drawDino(frameIndex, crashed);
+    // dino (cube, like the earliest demo)
+    ctx.fillStyle = crashed ? "#c0392b" : "#111";
+    ctx.fillRect(dino.x, dino.y - dino.h, dino.w, dino.h);
+
+    // eye (cute)
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(dino.x + dino.w - 10, dino.y - dino.h + 10, 4, 4);
 
     // obstacles
     for (const o of obstacles) {
       if (o.kind === "wall") {
         ctx.fillStyle = "rgba(0,0,0,0.95)";
+        ctx.fillRect(o.x, o.y - o.h, o.w, o.h);
+
+        // little stripes so it looks “special”
+        ctx.fillStyle = "rgba(255,255,255,0.12)";
+        for (let i = 0; i < 7; i++) {
+          ctx.fillRect(o.x + 10, o.y - o.h + 12 + i * 26, o.w - 20, 6);
+        }
       } else {
-        ctx.fillStyle = "rgba(18,18,18,1)";
+        ctx.fillStyle = "#111";
+        ctx.fillRect(o.x, o.y - o.h, o.w, o.h);
       }
-      ctx.fillRect(o.x, o.y - o.h, o.w, o.h);
     }
   }
 
-  // ---------------- Loop ----------------
+  // ---------- Update loop ----------
   function tick(ts) {
     if (lastTs == null) lastTs = ts;
     const dt = Math.min(0.033, (ts - lastTs) / 1000);
@@ -379,40 +301,46 @@
     if (running && !crashed && !blackout) {
       speed += SPEED_GAIN * dt;
 
+      // score
       distance += speed * dt * 0.06;
       scoreEl.textContent = String(Math.floor(distance));
 
-      // Append phrases once, in order
-      while (phraseIndex < thresholds.length && distance >= thresholds[phraseIndex]) {
-        appendMarquee(phrases[phraseIndex]);
-        phraseIndex++;
+      // main messages
+      updateMainMessages();
+
+      // endgame messages (close together)
+      if (!end1Shown && distance >= END_1_SCORE) {
+        showMessage(end1, 4500);
+        end1Shown = true;
+      }
+      if (!end2Shown && distance >= END_2_SCORE) {
+        showMessage(end2, 9000);
+        end2Shown = true;
+
+        // make it “a bit harder” after the line lands:
+        // tighter spawns by bumping speed ramp a touch (subtle, not brutal)
+        // (done by increasing SPEED_GAIN via speed itself—simple effect here)
+        speed += 40;
       }
 
-      // Append end beats once
-      if (!endBeat1Added && distance >= endBeat1At) {
-        appendMarquee(endBeat1);
-        endBeat1Added = true;
-      }
-      if (!endBeat2Added && distance >= endBeat2At) {
-        appendMarquee(endBeat2);
-        endBeat2Added = true;
+      // spawn huge unjumpable wall near the very end
+      if (!wallSpawned && distance >= WALL_SCORE) {
+        spawnHugeWall();
       }
 
-      // Spawn obstacles
+      // spawn obstacles
       nextSpawnIn -= dt;
-      if (nextSpawnIn <= 0) spawnObstaclePack();
+      if (nextSpawnIn <= 0) spawnObstacle();
 
-      // Move obstacles (world speed)
+      // move obstacles
       for (const o of obstacles) o.x -= speed * dt;
 
-      // Move marquee at *world speed* too (same as obstacles)
-      marqueeX -= speed * dt;
+      // remove off-screen
+      while (obstacles.length && obstacles[0].x + obstacles[0].w < -10) {
+        obstacles.shift();
+      }
 
-      // Remove off-screen obstacles
-      while (obstacles.length && obstacles[0].x + obstacles[0].w < -10) obstacles.shift();
-
-      // Dino physics
-      dino.animT += dt;
+      // physics: dino
       if (!dino.onGround) {
         dino.vy += GRAVITY * dt;
         dino.y += dino.vy * dt;
@@ -423,26 +351,10 @@
         }
       }
 
-      // Spawn the huge unjumpable wall ONLY after:
-      // - all phrases appended
-      // - end beats appended
-      // - and a bit of extra runway so it lands as the final gag
-      const allTextDone = (phraseIndex >= phrases.length) && endBeat1Added && endBeat2Added;
-      const wallAlready = obstacles.some(o => o.kind === "wall");
-      if (allTextDone && !wallAlready && distance >= (endBeat2At + 220)) {
-        spawnWall();
-      }
-
-      // Collision (hitbox tuned to sprite)
-      const dinoBox = {
-        x: dino.x + 18,
-        y: dino.y,
-        w: SPRITE_W - 40,
-        h: SPRITE_H - 10,
-      };
-
+      // collisions
+      const dinoBox = { x: dino.x, y: dino.y, w: dino.w, h: dino.h };
       for (const o of obstacles) {
-        if (overlap(dinoBox, o)) {
+        if (rectsOverlap(dinoBox, o)) {
           if (o.kind === "wall") {
             crashToBlack("Oops. I think I fucked up the specifications there a little.");
           } else {
@@ -457,7 +369,7 @@
     requestAnimationFrame(tick);
   }
 
-  // Boot
   resetGame();
-  fontReady.then(() => requestAnimationFrame(tick)).catch(() => requestAnimationFrame(tick));
+  draw();
+  requestAnimationFrame(tick);
 })();
