@@ -2,21 +2,21 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  touch-action: manipulation; /* helps iOS (less zoom/scroll weirdness) */
+  touch-action: manipulation;
   background: #f6f6f6;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  font-family: "Press Start 2P", system-ui, sans-serif;
 }
 
 #game {
-  image-rendering: pixelated;
   display: block;
   width: min(980px, 100vw);
   height: auto;
   margin: 80px auto 0 auto;
   background: #fff;
-  border: 1px solid rgba(0,0,0,0.12);
   border-radius: 16px;
+  border: 1px solid rgba(0,0,0,0.12);
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  image-rendering: pixelated;
 }
 
 .hud {
@@ -27,47 +27,10 @@ html, body {
   width: min(980px, calc(100vw - 24px));
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  pointer-events: none;
 }
 
-.title {
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  color: rgba(0,0,0,0.75);
-}
-
-.score {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(0,0,0,0.06);
-  color: rgba(0,0,0,0.75);
-}
-
-.overlay {
-  position: fixed;
-  top: 46px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(980px, calc(100vw - 24px));
-  padding: 14px 16px;
-  font-size: 17px;
-  line-height: 1.35;
-  background: rgba(255,255,255,0.94);
-  border: 1px solid rgba(0,0,0,0.12);
-  border-radius: 14px;
-  box-shadow: 0 10px 26px rgba(0,0,0,0.10);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 220ms ease;
-  z-index: 10;
-}
-
-.overlay.show {
-  opacity: 1;
+.score, .title {
+  font-size: 12px;
 }
 
 .hint {
@@ -77,8 +40,6 @@ html, body {
   transform: translateX(-50%);
   width: min(980px, calc(100vw - 24px));
   text-align: center;
-  font-size: 13px;
-  color: rgba(0,0,0,0.55);
-  user-select: none;
-  pointer-events: none;
+  font-size: 10px;
+  color: rgba(0,0,0,0.6);
 }
