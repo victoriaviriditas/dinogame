@@ -44,7 +44,7 @@ html, body {
   color: rgba(0,0,0,0.75);
 }
 
-.overlay {
+.overlay{
   position: fixed;
   top: 46px;
   left: 50%;
@@ -62,7 +62,7 @@ html, body {
   transition: opacity 220ms ease;
   z-index: 10;
 }
-.overlay.show { opacity: 1; }
+.overlay.show{ opacity: 1; }
 
 .hint {
   position: fixed;
