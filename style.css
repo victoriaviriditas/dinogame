@@ -8,6 +8,7 @@ html, body {
 }
 
 #game {
+  image-rendering: pixelated;
   display: block;
   width: min(980px, 100vw);
   height: auto;
