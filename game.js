@@ -1,7 +1,7 @@
 (() => {
   // ---------- Messages ----------
   const messages = [
-    "Question coming up (bear with me - remember I coded this shit / stole some from Google)",
+    "Question coming up (bear with me - I coded this shit, approx 700 lines)",
     "And yeah, you’re probably thinking: this dumb-ass had to code this stream of consciousness. Is this technically extra work or buffer for assets to load? We’ll never know…",
     "Anyway!!!",
     "Would you be free this coming Saturday to go for wine and/or dinner?",
